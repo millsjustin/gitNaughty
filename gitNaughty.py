@@ -1,5 +1,7 @@
 import requests
 import sys
+import time
+import datetime
 
 
 search_pattern = "-----BEGIN RSA PRIVATE KEY-----"
@@ -10,6 +12,15 @@ last_url_file = "last_url.txt"
 
 def verfiy(file_content: str):
     print(file_content)
+
+
+def check_rate_limit(count_remaining: str, reset_time: str):
+    if count_remaining == "0":
+        reset_time = datetime.datetime.fromtimestamp(float(reset_time))
+        time_to_wait = reset_time - datetime.datetime.now()
+        if time_to_wait.seconds <= 0:
+            return
+        time.sleep(time_to_wait.seconds + 1)
 
 
 def main():
@@ -39,6 +50,8 @@ def main():
 
         with open(last_url_file, "w") as last_file:
             last_file.write(api_response.links["next"]["url"])
+
+        check_rate_limit(api_response.headers["X-RateLimit-Remaining"], api_response.headers["X-RateLimit-Reset"])
 
         api_response = requests.get(api_response.links["next"]["url"])
 
