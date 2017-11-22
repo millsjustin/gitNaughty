@@ -20,6 +20,7 @@ def check_rate_limit(count_remaining: str, reset_time: str):
         time_to_wait = reset_time - datetime.datetime.now()
         if time_to_wait.seconds <= 0:
             return
+        print("Rate Limit Hit, Sleeping: {}".format(time_to_wait.seconds + 1))
         time.sleep(time_to_wait.seconds + 1)
 
 
