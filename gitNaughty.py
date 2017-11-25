@@ -4,8 +4,8 @@ import time
 import datetime
 import jacksonsVerification as jackson
 
-
-github_token = ""
+with open("github_token.txt", "r") as token_file:
+    github_token = token_file.read().strip()
 github_api_url = "https://api.github.com/search/code"
 search_pattern = jackson.get_search_pattern()
 GITHUB_API_MAX_FILESIZE = 383999 # < 384 KB
