@@ -5,12 +5,12 @@ import datetime
 import jacksonsVerification as jackson
 
 
-github_token = "0fb611b3f988aa081c180af3a4a15a938753cace"
+github_token = ""
 github_api_url = "https://api.github.com/search/code"
-search_pattern = "access_token"
+search_pattern = jackson.get_search_pattern()
 GITHUB_API_MAX_FILESIZE = 383999 # < 384 KB
-INITIAL_MIN_FILESIZE = 0 # initialize (in bytes)
-INITIAL_MAX_FILESIZE = 100
+INITIAL_MIN_FILESIZE = 20 # initialize (in bytes)
+INITIAL_MAX_FILESIZE = 40
 last_url_file = "last_url.txt"
 
 
@@ -105,8 +105,15 @@ def main():
         if max_filesize <= GITHUB_API_MAX_FILESIZE:
             print("Updated filesize parameters, making a new api call")
             print("Minimum file size is now: " + str(min_filesize) + " and max is: " + str(max_filesize))
-            api_response = requests.get(github_api_url, params=payload)
-            print("This many matches found: " + str(api_response.json()["total_count"]))
+            try:
+                api_response = requests.get(github_api_url, params=payload)
+                print("This many matches found: " + str(api_response.json()["total_count"])) # sometimes returns KeyError...
+            except KeyError:
+                # Wait and then try one more time
+                time.sleep(2)
+                api_response = requests.get(github_api_url, params=payload)
+                print("This many matches found: " + str(api_response.json()["total_count"]))
+
         else:
             print("Search has completed for all filesizes")
             break
