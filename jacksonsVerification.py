@@ -12,6 +12,8 @@ def check_for_token(potential_token):
     # first remove any additional occurrences of the search pattern
     potential_token = potential_token.replace("access_token", "")
     potential_token = potential_token.replace("accessToken", "")
+    potential_token = potential_token.replace("expires", "")
+
     pattern = re.compile("[a-zA-Z0-9\._]{10,80}")
     match_object = pattern.search(potential_token)
     if match_object is None:
