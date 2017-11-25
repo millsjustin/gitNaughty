@@ -17,6 +17,7 @@ last_url_file = "last_url.txt"
 def verify(file_content: str, search_pattern: str):
     jackson.verify(file_content, search_pattern)
 
+
 def check_rate_limit(count_remaining: str, reset_time: str):
     if count_remaining == "0":
         reset_time = datetime.datetime.fromtimestamp(float(reset_time))
@@ -26,7 +27,8 @@ def check_rate_limit(count_remaining: str, reset_time: str):
         print("Rate Limit Hit, Sleeping: {}".format(time_to_wait.seconds + 1))
         time.sleep(time_to_wait.seconds + 1)
 
-def  get_raw_url(item):
+
+def get_raw_url(item):
     return item["html_url"].replace(
         "https://github.com/",
         "https://raw.githubusercontent.com/"
@@ -34,6 +36,7 @@ def  get_raw_url(item):
         "/blob/",
         "/"
     )
+
 
 def update_filesize_window(min_filesize: int, max_filesize: int):
     filesize_step = max_filesize - min_filesize
@@ -46,10 +49,12 @@ def update_filesize_window(min_filesize: int, max_filesize: int):
             max_filesize = GITHUB_API_MAX_FILESIZE
     return [min_filesize, max_filesize]
 
+
 def update_payload(min_filesize: int, max_filesize: int):
     q = search_pattern + "+size:" + str(min_filesize) + ".." + str(max_filesize)
     payload = {"q": q, "access_token": github_token}
     return payload
+
 
 def get_filesize_info(last_file_content: str):
     begin_min = last_file_content.index("size%3A") + 7
@@ -60,7 +65,6 @@ def get_filesize_info(last_file_content: str):
     max_filesize = int(last_file_content[begin_max:end_max])
     filesize_step = max_filesize - min_filesize
     return [min_filesize, max_filesize, filesize_step]
-
 
 
 def main():
