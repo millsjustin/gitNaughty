@@ -5,7 +5,7 @@ import datetime
 import jacksonsVerification as jackson
 
 
-github_token = "0fb611b3f988aa081c180af3a4a15a938753cace"
+github_token = ""
 github_api_url = "https://api.github.com/search/code"
 search_pattern = jackson.get_search_pattern()
 GITHUB_API_MAX_FILESIZE = 383999 # < 384 KB
