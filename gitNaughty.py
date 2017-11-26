@@ -20,7 +20,7 @@ with open("github_token.txt", "r") as token_file:
 # file size paramaters
 GITHUB_API_MAX_FILESIZE = 383999  # < 384 KB
 INITIAL_MIN_FILESIZE = 1024  # initialize (in bytes)
-INITIAL_MAX_FILESIZE = 5120
+INITIAL_MAX_FILESIZE = 2048
 
 GITHUB_CODE_SEARCH_URL = "https://api.github.com/search/code"
 SEARCH_PATTERN = justinsVerification.private_key_search_pattern
@@ -34,7 +34,7 @@ def verify(item: dict):
         print("There was an error getting this raw file: {}".format(raw_url))
         return
 
-    justinsVerification.verifyPrivateKey(raw_file_response.text)
+    justinsVerification.verifyPrivateKey(raw_file_response.text, raw_url)
 
 
 def check_rate_limit(headers: dict):
@@ -61,7 +61,6 @@ def check_abuse_limit(api_response: requests.Response):
     time_to_wait = int(api_response.headers["Retry-After"]) + 1
     print("Abuse rate limit hit, Sleeping: {}".format(time_to_wait))
     time.sleep(time_to_wait)
-
 
 
 def get_raw_url(item):
@@ -142,6 +141,7 @@ def main():
         if not api_response.ok:
             if api_response.status_code == 403:
                 check_abuse_limit(api_response)
+                api_response = requests.get(api_state["next_url"])
                 continue
             else:
                 log_error_and_exit("There was an error with the github api: {}".format(api_response.text), api_response)
