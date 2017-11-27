@@ -6,20 +6,6 @@ rsa_key_re = re.compile("-+BEGIN RSA PRIVATE KEY-+(.*?)-+END RSA PRIVATE KEY-+",
 stat_shelve = shelve.open("privateKey.shelve")
 
 
-class ItemStats:
-    def __init__(self, url: str):
-        self.urls = [url]
-
-    def add(self, url: str):
-        self.urls.append(url)
-
-    def get_count(self):
-        return len(self.urls)
-
-    def __repr__(self):
-        return "Count: {}, URLs: {}".format(self.get_count(), self.urls)
-
-
 def verifyPrivateKey(file_content: str, url: str):
     stat_key = ""
     re_match = rsa_key_re.search(file_content)
