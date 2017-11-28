@@ -19,14 +19,16 @@ with open("github_token.txt", "r") as token_file:
 
 # file size paramaters
 GITHUB_API_MAX_FILESIZE = 383999  # < 384 KB
-INITIAL_MIN_FILESIZE = 1024  # initialize (in bytes)
-INITIAL_MAX_FILESIZE = 2048
+INITIAL_MIN_FILESIZE = 512  # initialize (in bytes)
+INITIAL_MAX_FILESIZE = 570
 
 GITHUB_CODE_SEARCH_URL = "https://api.github.com/search/code"
 SEARCH_PATTERN = justinsVerification.private_key_search_pattern
 
 
 def verify(item: dict):
+    justinsVerification.stats.checking_item()
+
     raw_url = get_raw_url(item)
     raw_file_response = requests.get(raw_url)
 
@@ -34,7 +36,7 @@ def verify(item: dict):
         print("There was an error getting this raw file: {}".format(raw_url))
         return
 
-    justinsVerification.verifyPrivateKey(raw_file_response.text, raw_url)
+    justinsVerification.verifyPrivateKey(raw_file_response.text, item)
 
 
 def check_rate_limit(headers: dict):
@@ -63,6 +65,61 @@ def check_abuse_limit(api_response: requests.Response):
     time.sleep(time_to_wait)
 
 
+def get_next_1000(min: int, max: int, payload: dict):
+    """
+    try to get less then 1000 results in the api search query
+    :param min: the current min file size
+    :param max: the current max file size
+    :return: try to return a request.Response with fewer than 1000 results
+    """
+    print("Getting next 1000 results.")
+    print("Current sizes are, min: {}, max: {}".format(min, max))
+    step = max - min
+    min = max
+    new_payload = payload.copy()
+    num_attempts = 1
+
+    while True:
+        max = min + step
+
+        if max >= GITHUB_API_MAX_FILESIZE:
+            max = GITHUB_API_MAX_FILESIZE
+            num_attempts = 100
+
+        print("Trying: Min: {}, Max: {}".format(min, max))
+        new_payload["q"] = build_api_query(SEARCH_PATTERN, min, max)
+        api_response = requests.get(GITHUB_CODE_SEARCH_URL, params=new_payload)
+
+        if not api_response.ok:
+            if api_response.status_code == 403:
+                check_abuse_limit(api_response)
+            else:
+                log_error_and_exit("Error with github api while trying to get next 1000", api_response)
+
+        response_json = api_response.json()
+
+        if "total_count" not in response_json:
+            log_error_and_exit("while trying to get next 1000 'total_count' not in api response", api_response)
+
+        total_count = response_json["total_count"]
+        print("total_count: {}".format(total_count))
+
+        if total_count <= 1000:
+            return (api_response, min, max)
+
+        new_step = int(step * (1000 / total_count))
+        if new_step >= step:
+            print("new step is larger than the previous step")
+            return (api_response, min, max)
+
+        step = new_step
+        num_attempts += 1
+
+        if num_attempts > 20:
+            print("tried 20 times to get less than 1000 results but didn't")
+            return (api_response, min, max)
+
+
 def get_raw_url(item):
     return item["html_url"].replace(
         "https://github.com/",
@@ -73,33 +130,8 @@ def get_raw_url(item):
     )
 
 
-def update_filesize_window(min_filesize: int, max_filesize: int):
-    filesize_step = max_filesize - min_filesize
-    if max_filesize == GITHUB_API_MAX_FILESIZE:
-        max_filesize += filesize_step
-    else:
-        min_filesize += filesize_step
-        max_filesize += filesize_step
-        if max_filesize > GITHUB_API_MAX_FILESIZE:
-            max_filesize = GITHUB_API_MAX_FILESIZE
-    return [min_filesize, max_filesize]
-
-
-def update_payload(min_filesize: int, max_filesize: int):
-    q = SEARCH_PATTERN + "+size:" + str(min_filesize) + ".." + str(max_filesize)
-    payload = {"q": q, "access_token": github_token}
-    return payload
-
-
-def get_filesize_info(last_file_content: str):
-    begin_min = last_file_content.index("size%3A") + 7
-    end_min = last_file_content.index("..", begin_min)
-    begin_max = end_min + 2
-    end_max = last_file_content.index("&", begin_max)
-    min_filesize = int(last_file_content[begin_min:end_min])
-    max_filesize = int(last_file_content[begin_max:end_max])
-    filesize_step = max_filesize - min_filesize
-    return [min_filesize, max_filesize, filesize_step]
+def build_api_query(search_term: str, min: int, max: int):
+    return "{}+size:{}..{}".format(search_term, min, max)
 
 
 def log_error_and_exit(message: str, api_response: requests.Response):
@@ -126,7 +158,7 @@ def main():
         "max_filesize": INITIAL_MAX_FILESIZE
     }
     payload = {
-        "q": "{}+size:{}..{}".format(SEARCH_PATTERN, api_state["min_filesize"], api_state["max_filesize"]),
+        "q": build_api_query(SEARCH_PATTERN, api_state["min_filesize"], api_state["max_filesize"]),
         "access_token": github_token,
         "per_page": 100
     }
@@ -155,47 +187,26 @@ def main():
             verify(item)
 
         if "next" not in api_response.links:
-            log_error_and_exit("There was no 'next' item in the api headers", api_response)
+            justinsVerification.stats.add_to_api_total_count(int(response_json["total_count"]))
+
+            if api_state["max_filesize"] >= GITHUB_API_MAX_FILESIZE:
+                log_error_and_exit("Reached github max filesize", api_response)
+
+            api_response, api_state["min_filesize"], api_state["max_filesize"] = get_next_1000(api_state["min_filesize"], api_state["max_filesize"], payload)
+            continue
+            # log_error_and_exit("There was no 'next' item in the api headers", api_response)
+
+        # TODO find a better way to persist stats data
+        justinsVerification.stats.save()
 
         api_state["next_url"] = api_response.links["next"]["url"]
         save_api_state(api_state)
-
         check_rate_limit(api_response.headers)
-
         api_response = requests.get(api_state["next_url"])
 
 
-"""
-    print("This many matches found: " + str(api_response.json()["total_count"]))
-    while True:
-
-        while "next" in api_response.links:
-
-            # handle the last case
-
-        print("Exhausted the response links")
-        [min_filesize, max_filesize] = update_filesize_window(min_filesize, max_filesize)
-        payload = update_payload(min_filesize, max_filesize)
-        if max_filesize <= GITHUB_API_MAX_FILESIZE:
-            print("Updated filesize parameters, making a new api call")
-            print("Minimum file size is now: " + str(min_filesize) + " and max is: " + str(max_filesize))
-            try:
-                api_response = requests.get(github_api_url, params=payload)
-                print("This many matches found: " + str(api_response.json()["total_count"])) # sometimes returns KeyError...
-            except KeyError:
-                # Wait and then try one more time
-                time.sleep(2)
-                api_response = requests.get(github_api_url, params=payload)
-                print("This many matches found: " + str(api_response.json()["total_count"]))
-
-        else:
-            print("Search has completed for all filesizes")
-            break
-"""
-
-
 def cleanup_and_exit():
-    justinsVerification.stat_shelve.close()
+    justinsVerification.stats.save()
     sys.exit()
 
 

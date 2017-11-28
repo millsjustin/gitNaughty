@@ -1,23 +1,33 @@
-import shelve
+import statsClass
 import re
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 
 private_key_search_pattern = "-----BEGIN RSA PRIVATE KEY-----"
-rsa_key_re = re.compile("-+BEGIN RSA PRIVATE KEY-+(.*?)-+END RSA PRIVATE KEY-+", flags=re.DOTALL)
-stat_shelve = shelve.open("privateKey.shelve")
+rsa_key_re = re.compile("-+BEGIN RSA PRIVATE KEY-+.*?-+END RSA PRIVATE KEY-+", flags=re.DOTALL)
+
+stats = statsClass.Stats()
 
 
-def verifyPrivateKey(file_content: str, url: str):
-    stat_key = ""
-    re_match = rsa_key_re.search(file_content)
+def get_key_from_bytes(data: bytes):
+    try:
+        return serialization.load_pem_private_key(
+            data,
+            password=None,
+            backend=default_backend()
+        )
+    except:
+        return None
 
-    if not re_match:
-        stat_key = file_content
-    else:
-        stat_key = re_match.group(1)
 
-    if stat_key not in stat_shelve:
-        stat_shelve[stat_key] = [url]
-    else:
-        stat_shelve[stat_key].append(url)
+def verifyPrivateKey(file_content: str, item: dict):
+    if stats.already_checked(item["html_url"]):
+        return
 
-    print(stat_key)
+    stats.checking_file(item["html_url"])
+
+    for potential_key in rsa_key_re.findall(file_content):
+        print(potential_key)
+        stats.match_found(potential_key, item["html_url"])
+        if get_key_from_bytes(potential_key.encode()):
+            stats.key_found(potential_key, item["html_url"])
