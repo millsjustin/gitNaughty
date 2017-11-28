@@ -19,8 +19,8 @@ with open("github_token.txt", "r") as token_file:
 
 # file size paramaters
 GITHUB_API_MAX_FILESIZE = 383999  # < 384 KB
-INITIAL_MIN_FILESIZE = 880  # initialize (in bytes)
-INITIAL_MAX_FILESIZE = 882
+INITIAL_MIN_FILESIZE = 896  # initialize (in bytes)
+INITIAL_MAX_FILESIZE = 896
 
 GITHUB_CODE_SEARCH_URL = "https://api.github.com/search/code"
 SEARCH_PATTERN = justinsVerification.private_key_search_pattern
@@ -104,6 +104,9 @@ def get_next_1000(min: int, max: int, payload: dict):
 
         total_count = response_json["total_count"]
         print("total_count: {}".format(total_count))
+
+        if total_count <= 0:
+            total_count = 1
 
         if total_count >= 100 and total_count <= 1000:
             return (api_response, min, max)
