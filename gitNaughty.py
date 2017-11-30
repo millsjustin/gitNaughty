@@ -19,8 +19,8 @@ with open("github_token.txt", "r") as token_file:
 
 # file size paramaters
 GITHUB_API_MAX_FILESIZE = 383999  # < 384 KB
-INITIAL_MIN_FILESIZE = 896  # initialize (in bytes)
-INITIAL_MAX_FILESIZE = 896
+INITIAL_MIN_FILESIZE = 4464  # initialize (in bytes)
+INITIAL_MAX_FILESIZE = 4464
 
 GITHUB_CODE_SEARCH_URL = "https://api.github.com/search/code"
 SEARCH_PATTERN = justinsVerification.private_key_search_pattern
@@ -75,17 +75,18 @@ def get_next_1000(min: int, max: int, payload: dict):
     print("Getting next 1000 results.")
     print("Current sizes are, min: {}, max: {}".format(min, max))
     step = max - min
-
     min = max + 1
     new_payload = payload.copy()
-    num_attempts = 1
+    num_attempts = 0
+    steps_tried = []
 
-    while True:
+    while num_attempts < 20:
+        num_attempts += 1
         max = min + step
+        steps_tried.append(step)
 
         if max >= GITHUB_API_MAX_FILESIZE:
             max = GITHUB_API_MAX_FILESIZE
-            num_attempts = 100
 
         print("Trying: Min: {}, Max: {}".format(min, max))
         new_payload["q"] = build_api_query(SEARCH_PATTERN, min, max)
@@ -94,6 +95,7 @@ def get_next_1000(min: int, max: int, payload: dict):
         if not api_response.ok:
             if api_response.status_code == 403:
                 check_abuse_limit(api_response)
+                continue
             else:
                 log_error_and_exit("Error with github api while trying to get next 1000", api_response)
 
@@ -105,23 +107,25 @@ def get_next_1000(min: int, max: int, payload: dict):
         total_count = response_json["total_count"]
         print("total_count: {}".format(total_count))
 
-        if total_count <= 0:
-            total_count = 1
-
-        if total_count >= 100 and total_count <= 1000:
+        if total_count < 100:
+            if steps_tried.count(step) > 1:
+                return (api_response, min, max)
+            elif step == 0:
+                step = 1
+            else:
+                step *= 2
+        elif total_count > 1000:
+            if step == 0:
+                return (api_response, min, max)
+            elif step == 1:
+                step = 0
+            else:
+                step //= 2
+        else:
             return (api_response, min, max)
 
-        new_step = int(step * (1000 / total_count))
-        if new_step == step:
-            print("new step is equal to the previous step")
-            return (api_response, min, max)
-
-        step = new_step
-        num_attempts += 1
-
-        if num_attempts > 20:
-            print("tried 20 times to get less than 1000 results but didn't")
-            return (api_response, min, max)
+    print("tried 20 times to get less than 1000 results but didn't")
+    return (api_response, min, max)
 
 
 def get_raw_url(item):
@@ -192,15 +196,16 @@ def main():
 
         if "next" not in api_response.links:
             justinsVerification.stats.add_to_api_total_count(int(response_json["total_count"]))
+            justinsVerification.stats.save()
+            save_api_state(api_state)
 
             if api_state["max_filesize"] >= GITHUB_API_MAX_FILESIZE:
                 log_error_and_exit("Reached github max filesize", api_response)
 
             try:
-                print("just finished a batch press ctrl+c in the next 15 seconds to exit")
-                time.sleep(15)
+                print("just finished a batch press ctrl+c in the next 5 seconds to exit")
+                time.sleep(5)
             except KeyboardInterrupt:
-                justinsVerification.stats.save()
                 log_error_and_exit("user pressed ctrl+c", api_response)
 
             api_response, api_state["min_filesize"], api_state["max_filesize"] = get_next_1000(api_state["min_filesize"], api_state["max_filesize"], payload)
