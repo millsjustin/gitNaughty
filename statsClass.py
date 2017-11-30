@@ -1,9 +1,10 @@
 import json
 
+
 class Stats:
-    def __init__(self, load_from_disk=False):
+    def __init__(self, load_from_disk=False, file_to_load="stats.json"):
         if load_from_disk:
-            with open("stats.json", "r") as stats_file:
+            with open(file_to_load, "r") as stats_file:
                 load_dict = json.load(stats_file)
             self._api_total_count = load_dict["api_total_count"]
             self._api_items_checked = load_dict["api_items_checked"]
