@@ -6,6 +6,7 @@ import json
 import pickle
 import jacksonsVerification
 import justinsVerification
+from utils import *
 
 # the state of the script will be saved in this file in json format
 # - the next api url
@@ -13,14 +14,10 @@ import justinsVerification
 # - the current max file size
 state_filename = "api_state.txt"
 
-# load the github api token from a file
-with open("github_token.txt", "r") as token_file:
-    github_token = token_file.read().strip()
-
 # file size paramaters
 GITHUB_API_MAX_FILESIZE = 383999  # < 384 KB
-INITIAL_MIN_FILESIZE = 4464  # initialize (in bytes)
-INITIAL_MAX_FILESIZE = 4464
+INITIAL_MIN_FILESIZE = 1  # initialize (in bytes)
+INITIAL_MAX_FILESIZE = 1
 
 GITHUB_CODE_SEARCH_URL = "https://api.github.com/search/code"
 SEARCH_PATTERN = justinsVerification.private_key_search_pattern
@@ -39,32 +36,6 @@ def verify(item: dict):
     justinsVerification.verifyPrivateKey(raw_file_response.text, item)
 
 
-def check_rate_limit(headers: dict):
-    if "X-RateLimit-Remaining" not in headers or "X-RateLimit-Reset" not in headers:
-        print("Rate limit info was not in the api response headers")
-        return
-
-    count_remaining = headers["X-RateLimit-Remaining"]
-    reset_time = headers["X-RateLimit-Reset"]
-
-    if count_remaining == "0":
-        reset_time = datetime.datetime.fromtimestamp(float(reset_time))
-        time_to_wait = reset_time - datetime.datetime.now()
-        if time_to_wait.seconds <= 0:
-            return
-        print("Rate Limit Hit, Sleeping: {}".format(time_to_wait.seconds + 1))
-        time.sleep(time_to_wait.seconds + 1)
-
-
-def check_abuse_limit(api_response: requests.Response):
-    if "Retry-After" not in api_response.headers:
-        log_error_and_exit("api response returned status code: 403 and 'Retry-After' is not in the headers", api_response)
-
-    time_to_wait = int(api_response.headers["Retry-After"]) + 1
-    print("Abuse rate limit hit, Sleeping: {}".format(time_to_wait))
-    time.sleep(time_to_wait)
-
-
 def get_next_1000(min: int, max: int, payload: dict):
     """
     try to get less then 1000 results in the api search query
@@ -79,6 +50,9 @@ def get_next_1000(min: int, max: int, payload: dict):
     new_payload = payload.copy()
     num_attempts = 0
     steps_tried = []
+
+    if min >= GITHUB_API_MAX_FILESIZE:
+        log_error_and_exit("Reached Github max file size", None)
 
     while num_attempts < 20:
         num_attempts += 1
@@ -128,25 +102,8 @@ def get_next_1000(min: int, max: int, payload: dict):
     return (api_response, min, max)
 
 
-def get_raw_url(item):
-    return item["html_url"].replace(
-        "https://github.com/",
-        "https://raw.githubusercontent.com/"
-    ).replace(
-        "/blob/",
-        "/"
-    )
-
-
 def build_api_query(search_term: str, min: int, max: int):
     return "{}+size:{}..{}".format(search_term, min, max)
-
-
-def log_error_and_exit(message: str, api_response: requests.Response):
-    print(message)
-    with open("api_response.pickle", "wb") as api_res_file:
-        pickle.dump(api_response, api_res_file)
-    cleanup_and_exit()
 
 
 def load_api_state():
@@ -221,11 +178,7 @@ def main():
         api_response = requests.get(api_state["next_url"])
 
 
-def cleanup_and_exit():
-    justinsVerification.stats.save()
-    sys.exit()
-
-
 if __name__ == "__main__":
+    things_to_close.append(justinsVerification.stats)
     main()
     cleanup_and_exit()
