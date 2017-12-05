@@ -5,6 +5,7 @@ import datetime
 import requests
 import pickle
 import sys
+import itertools
 
 # add things to this list that need to be closed when the program ends
 things_to_close = []
@@ -12,6 +13,11 @@ things_to_close = []
 # load the github api token from a file
 with open("github_token.txt", "r") as token_file:
     github_token = token_file.read().strip()
+with open("github_token_2.txt", "r") as token_file:
+    github_token_2 = token_file.read().strip()
+
+github_token_list = [github_token, github_token_2]
+token_cycle = itertools.cycle(github_token_list)
 
 
 def get_raw_url(item):
