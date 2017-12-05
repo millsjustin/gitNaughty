@@ -5,6 +5,7 @@ last_url.txt
 *.shelve
 *.idea
 *.DS_Store
+*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
