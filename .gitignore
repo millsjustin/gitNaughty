@@ -1,4 +1,13 @@
-github_token.txt
+github_token*.txt
+api_state.txt
+last_url.txt
+*.pickle
+*.shelve
+*.idea
+*.DS_Store
+*.json
+
+results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
