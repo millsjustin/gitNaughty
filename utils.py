@@ -6,18 +6,17 @@ import requests
 import pickle
 import sys
 import itertools
+import glob
 
 # add things to this list that need to be closed when the program ends
 things_to_close = []
 
-# load the github api token from a file
-with open("github_token.txt", "r") as token_file:
-    github_token = token_file.read().strip()
-with open("github_token_2.txt", "r") as token_file:
-    github_token_2 = token_file.read().strip()
-
-github_token_list = [github_token, github_token_2]
-token_cycle = itertools.cycle(github_token_list)
+# load the github api tokens into an itertools.cycle
+github_tokens = []
+for file_str in glob.glob("github_token*.txt"):
+    with open(file_str) as token_file:
+        github_tokens.append(token_file.read().strip())
+token_cycle = itertools.cycle(github_tokens)
 
 
 def get_raw_url(item):
@@ -54,8 +53,12 @@ def check_rate_limit(headers: dict):
         time_to_wait = reset_time - datetime.datetime.now()
         if time_to_wait.seconds <= 0:
             return
-        print("Rate Limit Hit, Sleeping: {}".format(time_to_wait.seconds + 1))
-        time.sleep(time_to_wait.seconds + 1)
+        elif time_to_wait.seconds >= 180:
+            print("Time to wait was more than 180 seconds. Only sleeping: 180")
+            time.sleep(180)
+        else:
+            print("Rate Limit Hit, Sleeping: {}".format(time_to_wait.seconds + 1))
+            time.sleep(time_to_wait.seconds + 1)
 
 
 def check_abuse_limit(api_response: requests.Response):
@@ -78,4 +81,3 @@ def cleanup_and_exit():
     for item in things_to_close:
         item.close()
     sys.exit()
-
