@@ -49,6 +49,10 @@ def main():
         errors = []
 
     for key in total_stats._valid_keys:
+        if key in used_keys:
+            print("Already checked this key")
+            continue
+
         checked_file_names = set()
         checked_repos = set()
 
