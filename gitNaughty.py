@@ -124,7 +124,7 @@ def main():
     }
     payload = {
         "q": build_api_query(SEARCH_PATTERN, api_state["min_filesize"], api_state["max_filesize"]),
-        "access_token": github_token,
+        "access_token": token_cycle.__next__(),
         "per_page": 100
     }
 
