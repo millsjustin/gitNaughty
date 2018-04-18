@@ -1,5 +1,5 @@
-# gitNaughty
-A tool for assessing the prevalence of improperly exposed keys in GitHub public repositories
+# gitSecrets
+A projet which assessed the prevalence of improperly exposed keys in GitHub public repositories
 
 ## Network Security Final Project
 Our team decided to scan GitHub for API tokens and RSA private keys people had accidentally committed to public repos. The purpose of the project was to determine how widespread this issue has become.
